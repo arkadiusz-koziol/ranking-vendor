@@ -14,6 +14,7 @@ final class LaravelRankingsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/Config/rankings.php', 'rankings');
         $this->app->singleton(RankingRepository::class, function ($app) {
             return new RankingCacheRepository(
                 new EloquentRankingRepository(),
@@ -22,29 +23,26 @@ final class LaravelRankingsServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(RankingCalculatorLocator::class, function ($app) {
-            $calculators = array_map(
-                fn (string $class) => $app->make($class),
-                $app['config']['rankings.calculators']
-            );
+            $calculatorClasses = $app['config']->get('rankings.calculators', []);
+
+            $calculators = array_map(fn (string $c) => $app->make($c), $calculatorClasses);
 
             return new RankingCalculatorLocator($calculators);
         });
 
-        foreach ($this->app['config']['rankings.calculators'] as $calculator) {
+        foreach ($this->app['config']->get('rankings.calculators', []) as $calculator) {
             $this->app->bind($calculator, $calculator);
         }
     }
 
     public function boot(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/Config/rankings.php', 'rankings');
-
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__ . '/Config/rankings.php' => config_path('rankings.php'),
+                __DIR__.'/Config/rankings.php' => config_path('rankings.php'),
             ], 'config');
 
-            $this->loadMigrationsFrom(__DIR__ . '/Infrastructure/Migration');
+            $this->loadMigrationsFrom(__DIR__.'/Infrastructure/Migration');
         }
     }
 }
